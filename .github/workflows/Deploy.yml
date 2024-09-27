@@ -97,4 +97,4 @@ jobs:
 
       # Step 5: Confirm deployment (optional)
       - name: Check Deployment
-        run: curl http://${{ secrets.AWS_EC2_HOST }}/hello
+        run: curl http://${{ secrets.AWS_EC2_HOST }}:8080/hello
