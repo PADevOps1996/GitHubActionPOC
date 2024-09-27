@@ -64,9 +64,9 @@ jobs:
       - name: Print working directory
         run: pwd
 
-      # Step 3: List the downloaded files (for verification)
-      - name: List downloaded files
-        run: ls -la ./war-file
+      # Step 3: List the directory structure and find the downloaded file
+      - name: List all files and directories
+        run: ls -Rla
 
       # Step 4: Configure AWS credentials using GitHub Secrets
       - name: Configure AWS credentials
