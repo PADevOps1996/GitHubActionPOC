@@ -18,27 +18,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up JDK 11 (or another version)
+      # Step 2: Print current working directory
+      - name: Print current working directory
+        run: pwd
+
+      # Step 3: List contents of the repository directory
+      - name: List contents of repo directory
+        run: ls -la /home/runner/work/GitHubActionPOC/GitHubActionPOC
+
+      # Step 4: Set up JDK 11 (or another version)
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # Step 3: Build the project with Maven
+      # Step 5: Build the project with Maven
       - name: Build with Maven
         run: mvn -B package --file pom.xml
 
-      # Step 4: Verify the generated WAR file (list the contents of the target directory)
-      - name: List files in target directory
-        run: ls -l target/
+      # Step 6: List the contents of the target directory after build
+      - name: List target directory
+        run: ls -la /home/runner/work/GitHubActionPOC/GitHubActionPOC/target
 
-      # Step 5: Upload the WAR file as an artifact for deployment
+      # Step 7: Upload the WAR file as an artifact for deployment
       - name: Upload WAR file as artifact
         uses: actions/upload-artifact@v3
         with:
           name: war-file
-          path: target/*.war  # This path assumes your WAR file is in the 'target' directory after Maven build
+          path: /home/runner/work/GitHubActionPOC/GitHubActionPOC/target/*.war
 
   # CD Job - Deploy to EC2
   deploy:
@@ -51,11 +59,10 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: war-file
-          path: ./war-file/  # Define the directory where the artifact will be downloaded
 
       # Step 2: List the downloaded files (for verification)
       - name: List downloaded files
-        run: ls -l ./war-file/
+        run: ls -la war-file
 
       # Step 3: Configure AWS credentials using GitHub Secrets
       - name: Configure AWS credentials
@@ -82,7 +89,7 @@ jobs:
           aws ssm send-command \
             --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo cp ./war-file/*.war /opt/tomcat/webapps/ROOT.war"]' \
+            --parameters 'commands=["sudo cp war-file/*.war /opt/tomcat/webapps/ROOT.war"]' \
             --comment "Deploying new WAR file to Tomcat"
 
       # Step 6: List the contents of Tomcat webapps directory on EC2 (verify the WAR file is copied)
@@ -91,7 +98,7 @@ jobs:
           aws ssm send-command \
             --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["ls -l /opt/tomcat/webapps/"]' \
+            --parameters 'commands=["ls -la /opt/tomcat/webapps/"]' \
             --comment "Checking if the ROOT.war file exists"
 
       # Step 7: Restart Tomcat to apply the new deployment
