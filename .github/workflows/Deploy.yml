@@ -84,7 +84,16 @@ jobs:
             --parameters 'commands=["sudo cp ./war-file/*.war /var/lib/tomcat/webapps/ROOT.war"]' \
             --comment "Deploying new WAR file to Tomcat"
 
-      # Step 6: Restart Tomcat to apply the new deployment
+      # Step 6: List the contents of Tomcat webapps directory on EC2 (verify the WAR file is copied)
+      - name: Verify WAR file is copied to EC2
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ env.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["ls -l /var/lib/tomcat/webapps/"]' \
+            --comment "Checking if the ROOT.war file exists"
+
+      # Step 7: Restart Tomcat to apply the new deployment
       - name: Restart Tomcat on EC2
         run: |
           aws ssm send-command \
@@ -93,6 +102,15 @@ jobs:
             --parameters 'commands=["sudo systemctl restart tomcat"]' \
             --comment "Restarting Tomcat"
 
-      # Step 7: Verify Deployment by Curling the Application URL
+      # Step 8: Check Tomcat Status (Verify Tomcat is running)
+      - name: Check Tomcat status
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ env.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["sudo systemctl status tomcat"]' \
+            --comment "Checking Tomcat status"
+
+      # Step 9: Verify Deployment by Curling the Application URL
       - name: Check Deployment
         run: curl http://${{ secrets.AWS_EC2_HOST }}:8080/hello
