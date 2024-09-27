@@ -81,7 +81,7 @@ jobs:
           aws ssm send-command \
             --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo cp ./war-file/*.war /var/lib/tomcat/webapps/ROOT.war"]' \
+            --parameters 'commands=["sudo cp ./war-file/*.war /opt/tomcat/webapps/ROOT.war"]' \
             --comment "Deploying new WAR file to Tomcat"
 
       # Step 6: List the contents of Tomcat webapps directory on EC2 (verify the WAR file is copied)
@@ -90,7 +90,7 @@ jobs:
           aws ssm send-command \
             --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["ls -l /var/lib/tomcat/webapps/"]' \
+            --parameters 'commands=["ls -l /opt/tomcat/webapps/"]' \
             --comment "Checking if the ROOT.war file exists"
 
       # Step 7: Restart Tomcat to apply the new deployment
