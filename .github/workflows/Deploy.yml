@@ -9,6 +9,7 @@ on:
       - main
 
 jobs:
+  # CI Job - Build and Test
   build:
     runs-on: ubuntu-latest
 
@@ -17,7 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up JDK 11
+      # Step 2: Set up JDK 11 (or another version)
       - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
@@ -28,73 +29,70 @@ jobs:
       - name: Build with Maven
         run: mvn -B package --file pom.xml
 
-      # Step 4: Run tests
-      - name: Run tests with Maven
-        run: mvn test
+      # Step 4: Verify the generated WAR file (list the contents of the target directory)
+      - name: List files in target directory
+        run: ls -l target/
 
-      # Step 5: Archive the WAR file as an artifact for use in deployment
+      # Step 5: Upload the WAR file as an artifact for deployment
       - name: Upload WAR file as artifact
         uses: actions/upload-artifact@v3
         with:
           name: war-file
-          path: target/*.war
+          path: target/*.war  # This path assumes your WAR file is in the 'target' directory after Maven build
 
+  # CD Job - Deploy to EC2
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Download the WAR file artifact
+      # Step 1: Download the WAR file artifact from the previous build job
       - name: Download WAR file artifact
         uses: actions/download-artifact@v3
         with:
           name: war-file
 
-      # Step 2: Configure AWS credentials
+      # Step 2: List the downloaded files (for verification)
+      - name: List downloaded files
+        run: ls -l
+
+      # Step 3: Configure AWS credentials using GitHub Secrets
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-2  # Replace with your AWS region
+          aws-region: ap-southeast-2  # Replace with your desired AWS region
 
-      # Step 3: Use SSM to copy the WAR file and restart Tomcat
-      - name: Deploy to EC2 using AWS SSM
+      # Step 4: Retrieve the EC2 instance ID (using instance tag or name)
+      - name: Retrieve EC2 instance ID
+        id: ec2info
         run: |
           instance_id=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${{ secrets.EC2_INSTANCE_NAME }}" \
             --query "Reservations[*].Instances[*].InstanceId" \
             --output text)
+          echo "instance_id=$instance_id" >> $GITHUB_ENV
+          echo "EC2 Instance ID: $instance_id"
 
-          # Copy the WAR file to the EC2 instance using SSM
+      # Step 5: Deploy the WAR file to Tomcat on the EC2 instance using SSM
+      - name: Deploy WAR file to EC2 via SSM
+        run: |
           aws ssm send-command \
-            --instance-ids "$instance_id" \
+            --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo cp /path/to/downloaded/simple-webapp.war /var/lib/tomcat/webapps/ROOT.war"]' \
+            --parameters 'commands=["sudo cp ./war-file/*.war /var/lib/tomcat/webapps/ROOT.war"]' \
             --comment "Deploying new WAR file to Tomcat"
 
-      # Step 4: Stop and start Tomcat via SSM
-      - name: Restart Tomcat via SSM
+      # Step 6: Restart Tomcat to apply the new deployment
+      - name: Restart Tomcat on EC2
         run: |
-          instance_id=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${{ secrets.EC2_INSTANCE_NAME }}" \
-            --query "Reservations[*].Instances[*].InstanceId" \
-            --output text)
-
-          # Stop Tomcat
           aws ssm send-command \
-            --instance-ids "$instance_id" \
+            --instance-ids "${{ env.instance_id }}" \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo systemctl stop tomcat"]' \
-            --comment "Stopping Tomcat"
+            --parameters 'commands=["sudo systemctl restart tomcat"]' \
+            --comment "Restarting Tomcat"
 
-          # Start Tomcat
-          aws ssm send-command \
-            --instance-ids "$instance_id" \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["sudo systemctl start tomcat"]' \
-            --comment "Starting Tomcat"
-
-      # Step 5: Confirm deployment (optional)
+      # Step 7: Verify Deployment by Curling the Application URL
       - name: Check Deployment
         run: curl http://${{ secrets.AWS_EC2_HOST }}:8080/hello
