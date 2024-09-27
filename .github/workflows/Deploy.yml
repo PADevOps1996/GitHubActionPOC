@@ -51,10 +51,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: war-file
+          path: ./war-file/  # Define the directory where the artifact will be downloaded
 
       # Step 2: List the downloaded files (for verification)
       - name: List downloaded files
-        run: ls -l
+        run: ls -l ./war-file/
 
       # Step 3: Configure AWS credentials using GitHub Secrets
       - name: Configure AWS credentials
