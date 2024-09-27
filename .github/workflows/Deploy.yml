@@ -60,11 +60,15 @@ jobs:
         with:
           name: war-file
 
-      # Step 2: List the downloaded files (for verification)
-      - name: List downloaded files
-        run: ls -la war-file
+      # Step 2: Print working directory
+      - name: Print working directory
+        run: pwd
 
-      # Step 3: Configure AWS credentials using GitHub Secrets
+      # Step 3: List the downloaded files (for verification)
+      - name: List downloaded files
+        run: ls -la ./war-file
+
+      # Step 4: Configure AWS credentials using GitHub Secrets
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -72,7 +76,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2  # Replace with your desired AWS region
 
-      # Step 4: Retrieve the EC2 instance ID (using instance tag or name)
+      # Step 5: Retrieve the EC2 instance ID (using instance tag or name)
       - name: Retrieve EC2 instance ID
         id: ec2info
         run: |
@@ -83,7 +87,7 @@ jobs:
           echo "instance_id=$instance_id" >> $GITHUB_ENV
           echo "EC2 Instance ID: $instance_id"
 
-      # Step 5: Deploy the WAR file to Tomcat on the EC2 instance using SSM
+      # Step 6: Deploy the WAR file to Tomcat on the EC2 instance using SSM
       - name: Deploy WAR file to EC2 via SSM
         run: |
           aws ssm send-command \
@@ -92,7 +96,7 @@ jobs:
             --parameters 'commands=["sudo cp war-file/*.war /opt/tomcat/webapps/ROOT.war"]' \
             --comment "Deploying new WAR file to Tomcat"
 
-      # Step 6: List the contents of Tomcat webapps directory on EC2 (verify the WAR file is copied)
+      # Step 7: List the contents of Tomcat webapps directory on EC2 (verify the WAR file is copied)
       - name: Verify WAR file is copied to EC2
         run: |
           aws ssm send-command \
@@ -101,7 +105,7 @@ jobs:
             --parameters 'commands=["ls -la /opt/tomcat/webapps/"]' \
             --comment "Checking if the ROOT.war file exists"
 
-      # Step 7: Restart Tomcat to apply the new deployment
+      # Step 8: Restart Tomcat to apply the new deployment
       - name: Restart Tomcat on EC2
         run: |
           aws ssm send-command \
@@ -110,7 +114,7 @@ jobs:
             --parameters 'commands=["sudo systemctl restart tomcat"]' \
             --comment "Restarting Tomcat"
 
-      # Step 8: Check Tomcat Status (Verify Tomcat is running)
+      # Step 9: Check Tomcat Status (Verify Tomcat is running)
       - name: Check Tomcat status
         run: |
           aws ssm send-command \
@@ -119,6 +123,6 @@ jobs:
             --parameters 'commands=["sudo systemctl status tomcat"]' \
             --comment "Checking Tomcat status"
 
-      # Step 9: Verify Deployment by Curling the Application URL
+      # Step 10: Verify Deployment by Curling the Application URL
       - name: Check Deployment
         run: curl http://${{ secrets.AWS_EC2_HOST }}:8080/hello
