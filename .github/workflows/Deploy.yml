@@ -1,73 +1,51 @@
-name: CI/CD for Java Web App
+name: Java Application Deployment to EC2 (Ubuntu)
 
-# Run this pipeline on pushes to the main branch
+# Trigger deployment only on push to main branch
 on:
   push:
     branches:
       - main
 
 jobs:
-  # Step 1: Build the Java web application
   build:
-    name: Build Java App
+    name: Build and Deploy Java Application
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout code
+      # Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v2
 
-      # Set up JDK 1.8 for building the Java app
+      # Set up JDK 1.8 for Maven
       - name: Set up JDK 1.8
         uses: actions/setup-java@v1
         with:
           java-version: '1.8'
 
-      # Run Maven clean and package to build the WAR file
+      # Build with Maven
       - name: Build with Maven
         run: mvn clean package
 
-      # Archive the WAR file as an artifact for the deployment job
-      - name: Archive WAR file
-        uses: actions/upload-artifact@v2
-        with:
-          name: war-file
-          path: target/simple-webapp.war
-
-  # Step 2: Deploy the WAR file to an EC2 instance
-  deploy:
-    name: Deploy to EC2
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      # Download the WAR file artifact from the build job
-      - name: Download WAR artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: war-file
-          path: ./simple-webapp.war
-
-      # Deploy the WAR file to the remote EC2 instance using SSH
-      - name: Deploy WAR to EC2 Server
+      # Deploy WAR file to EC2 (Ubuntu)
+      - name: Deploy WAR to EC2
         uses: easingthemes/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST: ${{ secrets.HOST_DNS }}
           REMOTE_USER: ${{ secrets.USERNAME }}
-          TARGET: /var/lib/tomcat9/webapps/  # Directory for Tomcat deployments
+          TARGET: ${{ secrets.TARGET_DIR }}/simple-webapp.war
 
-      # Execute remote commands to move and deploy WAR file on Tomcat
-      - name: Run remote commands
+      # Execute remote commands on Ubuntu EC2
+      - name: Install and Configure Apache Tomcat on Ubuntu EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST_DNS }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo apt-get -y update
+            sudo apt-get update -y
             sudo apt-get install -y tomcat9
             sudo systemctl start tomcat9
             sudo systemctl enable tomcat9
-            sudo mv /home/ubuntu/simple-webapp.war /var/lib/tomcat9/webapps/
+            sudo mv ${{ secrets.TARGET_DIR }}/simple-webapp.war /var/lib/tomcat9/webapps/
             sudo systemctl restart tomcat9
